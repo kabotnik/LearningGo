@@ -5,45 +5,61 @@ import (
 	"image/color"
 	"image/gif"
 	"io"
+	"log"
 	"math"
 	"math/rand"
+	"net/http"
 	"os"
-)
-
-import (
+	"strconv"
 	"time"
 )
 
 // var palette = []color.Color{color.White, color.Black}
-var palette = []color.Color{color.Black, color.RGBA{0x00,0xff,0x00,0xff}}
+var palette = []color.Color{color.Black,
+	color.RGBA{0x00, 0xff, 0x00, 0xff},
+	color.White,
+	color.RGBA{0x00, 0x00, 0xff, 0xff},
+	color.RGBA{0xff, 0x00, 0x00, 0xff},
+	color.RGBA{0xff, 0x00, 0xff, 0xff},
+	color.RGBA{0xff, 0xff, 0x00, 0xff},
+	color.RGBA{0x00, 0xff, 0xff, 0xff},
+}
 
-const (
-	//whiteIndex = 0 // first color in palette
-	//blackIndex = 1 // next color in palette
+// const (
+// 	//whiteIndex = 0 // first color in palette
+// 	//blackIndex = 1 // next color in palette
 
-	blackIndex = 0
-	greenIndex = 1
-)
+// 	blackIndex = 0
+// 	greenIndex = 1
+// 	whiteIndex = 2
+// )
 
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	var file *os.File
-	if len(os.Args) > 1 {
-		temp, err := os.Create(os.Args[1])
-		if err != nil {
-			os.Exit(1)
-		}
-		file = temp
-	} else {
-		file = os.Stdout
+	if len(os.Args) > 1 && os.Args[1] == "web" {
+		// hander := func(w http.ResponseWriter, r *http.Request) {
+		// 	lissajous(w)
+		// }
+		// http.HandleFunc("/", handler)
+		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			qv := r.URL.Query()
+			c := qv.Get("cycles")
+			cycles, err := strconv.Atoi(c)
+			if err != nil {
+				cycles = 5
+			}
+			lissajous(w, cycles)
+		})
+		log.Fatal(http.ListenAndServe("localhost:8000", nil))
+		return
 	}
-	lissajous(file)
+	lissajous(os.Stdout, 5)
 }
 
-func lissajous(out io.Writer) {
+func lissajous(out io.Writer, cycles int) {
+	numCycles := float64(cycles) // number of complete x oscillator revolutions
 	const (
-		cycles  = 5     // number of complete x oscillator revolutions
 		res     = 0.001 // angular resolution
 		size    = 100   // image canvas covers [-size..+size]
 		nframes = 64    // number of animation frames
@@ -55,12 +71,13 @@ func lissajous(out io.Writer) {
 	for i := 0; i < nframes; i++ {
 		rect := image.Rect(0, 0, 2*size+1, 2*size+1)
 		img := image.NewPaletted(rect, palette)
-		for t := 0.0; t < cycles*2*math.Pi; t += res {
+		for t := 0.0; t < numCycles*2*math.Pi; t += res {
 			x := math.Sin(t)
 			y := math.Sin(t*freq + phase)
+			paletteColor := (i % (len(palette) - 1)) + 1
+			color := uint8(paletteColor)
 			img.SetColorIndex(size+int(x*size+0.5), size+int(y*size+0.5),
-				// blackIndex)
-				greenIndex)
+				color)
 		}
 		phase += 0.1
 		anim.Delay = append(anim.Delay, delay)
